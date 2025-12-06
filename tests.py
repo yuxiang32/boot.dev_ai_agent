@@ -2,7 +2,7 @@ from modulefinder import test
 
 from functions.get_file_content import get_file_content
 from functions.get_files_info import get_files_info
-from functions.write_file import write_file
+from functions.write_file_content import write_file
 
 
 def test_get_files_info():
