@@ -1,6 +1,7 @@
 import argparse
 import os
 import sys
+import time
 
 from dotenv import load_dotenv
 from google import genai
@@ -28,7 +29,18 @@ def main():
     if args.verbose:
         print(f"User prompt: {args.user_prompt}\n")
 
-    generate_content(client, messages, args.verbose)
+    for i in range(20):
+        try:
+            is_done = generate_content(client, messages, args.verbose)
+            if is_done:
+                break
+        except Exception as e:
+            if "503" in str(e) or "overloaded" in str(e).lower():
+                print(f"Server overloaded, retrying in {2**i} seconds...")
+                time.sleep(2**i)
+                continue
+            print(f"Error: {e}")
+            break
 
 
 def generate_content(client, messages, verbose):
@@ -45,10 +57,16 @@ def generate_content(client, messages, verbose):
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
 
+    # Check the .candidates property
+    # print(f"Candidates: {response.candidates[0].content}")
+    if response.candidates:
+        for candidate in response.candidates:
+            messages.append(candidate.content)
+
     if not response.function_calls:
         print("Response:")
         print(response.text)
-        return
+        return True
 
     function_call_list = []
     for function_call_part in response.function_calls:
@@ -59,6 +77,10 @@ def generate_content(client, messages, verbose):
         function_call_list.append(function_result.parts[0])
         if verbose:
             print(f"-> {function_result.parts[0].function_response.response}")
+
+    # Using types.Content constructor to convert the list of responses into a message
+    messages.append(types.Content(role="user", parts=function_call_list))
+    return False
 
 
 if __name__ == "__main__":
